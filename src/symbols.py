@@ -30,4 +30,6 @@ def get_symbols(file_path: str='../data/names.csv'):
 """
 def get_completed(file_path: str='../data/completed.txt'):
   with open(file_path, 'r') as symbols_file:
-    return symbols_file.readlines()
+    symbols = symbols_file.readlines()
+    symbols = [symbol.strip().lower() for symbol in symbols]
+    return symbols
