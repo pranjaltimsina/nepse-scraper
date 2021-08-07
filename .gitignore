@@ -1,6 +1,4 @@
-data/price_history
-completed.txt
-logs.log
+data/price_history/*
 __pycache__
 .vscode
 *.log
