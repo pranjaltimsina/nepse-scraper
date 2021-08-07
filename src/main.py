@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(format='%(asctime)s %(levelname)s - %(message)s', level=logging.INFO, filename='logs.log')
+# logging.basicConfig(format='%(asctime)s %(levelname)s - %(message)s', level=logging.INFO, filename='logs.log')
 
 import sys
 import time
@@ -10,13 +10,30 @@ from selenium.webdriver.chrome.options import Options
 from symbols import get_completed, get_symbols
 from get_max_page import get_max_page
 
+def setup_logger(logger_name, log_file, level=logging.INFO):
+    l = logging.getLogger(logger_name)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s - %(message)s')
+    fileHandler = logging.FileHandler(log_file, mode='a')
+    fileHandler.setFormatter(formatter)
+    streamHandler = logging.StreamHandler()
+    streamHandler.setFormatter(formatter)
+
+    l.setLevel(level)
+    l.addHandler(fileHandler)
+    l.addHandler(streamHandler)
+
 def main(argv):
+  setup_logger('compact_log', './compact.log')
+  setup_logger('verbose_log', './verbose.log')
+  logger_c = logging.getLogger('compact_log')
+  logger_v = logging.getLogger('verbose_log')
 
   try:
     symbols: list(str) = get_symbols()
-    # logging.info('Symbols loaded.')
+    logger_v.info('Symbols loaded.')
   except FileNotFoundError:
-    logging.error("Symbols file not found.")
+    logger_v.error("Symbols file not found.")
+    logger_c.error("Symbols file not found.")
     sys.exit()
 
   try:
@@ -26,70 +43,77 @@ def main(argv):
       try:
         symbols.remove(complete)
       except ValueError:
-        logging.warning(f'Symbol {complete} not in the list of symbols')
-    # logging.info('Scraped symbols list loaded.')
+        logger_c.warning(f'Symbol {complete} not in the list of symbols')
+        logger_v.warning(f'Symbol {complete} not in the list of symbols')
+    logger_v.info('Scraped symbols list loaded.')
   except FileNotFoundError:
-    logging.warning('Could not find file with symbols that have already been scraped.')
+    logger_c.warning('Could not find file with symbols that have already been scraped.')
+    logger_v.warning('Could not find file with symbols that have already been scraped.')
 
   options = Options()
   options.headless = True
 
   try:
     driver = webdriver.Chrome(executable_path=r'D://Dev/chromedriver.exe', options=options)
-    # logging.info('Driver started.')
+    logger_v.info('Driver started.')
   except:
-    logging.info('Driver start up failed')
+    logger_v.info('Driver start up failed')
+    logger_c.info('Driver start up failed')
     sys.exit()
-
 
   if (len(argv) == 1):
     symbol = argv[0]
-    # logging.info(f"{symbol} recieved from argv.")
+    logger_v.info(f"{symbol} recieved from argv.")
     if symbol.strip() not in symbols:
-      logging.error(f"{symbol} revieved not in list of symbols.")
+      logger_c.error(f"{symbol} revieved not in list of symbols.")
+      logger_v.error(f"{symbol} revieved not in list of symbols.")
       sys.exit()
     else:
-      # logging.info(f'{symbol} found in the list of symbols.')
+      logger_v.info(f'{symbol} found in the list of symbols.')
       symbols = [symbol]
   else:
     symbols = symbols[:5]
-    # logging.info(f"No argv supplied, {symbols} are being scraped.")
+    logger_v.info(f"No argv supplied, {symbols} are being scraped.")
 
   for symbol in symbols:
     start_time = time.time()
-    logging.info(f"{symbol} is being scraped.")
+    logger_c.info(f"{symbol} is being scraped.")
+    logger_v.info(f"{symbol} is being scraped.")
     try:
       driver.get(f"https://www.sharesansar.com/company/{symbol}")
-      # logging.info('Successfully opened site')
+      logger_v.info('Successfully opened site')
     except:
-      logging.error('Could not GET site.')
+      logger_c.error('Could not GET site.')
+      logger_v.error('Could not GET site.')
       continue
 
     try:
       price_button = driver.find_element_by_id('btn_cpricehistory')
       price_button.click()
-      # logging.info('Price Button found.')
-      # logging.info('Price Button Clicked.')
+      logger_v.info('Price Button  found and clicked on.')
       time.sleep(3)
     except:
-      logging.error('Price button couldn\'t be found and clicked on.')
+      logger_c.error('Price button couldn\'t be found and clicked on.')
+      logger_v.error('Price button couldn\'t be found and clicked on.')
       driver.quit()
       sys.exit()
 
     try:
       table = driver.find_element_by_id("myTableCPriceHistory")
-      # logging.info('Table found')
+      logger_v.info('Table found')
     except:
         driver.quit()
-        logging.error('Table not found. Driver Closed')
+        logger_v.error('Table not found. Driver Closed')
+        logger_c.error('Table not found. Driver Closed')
 
     header = table.text
     header = ",".join(header.split(" "))
-    # logging.info('Header text scraped')
+    logger_v.info('Header text scraped')
 
     buttons = driver.find_elements_by_class_name('paginate_button')
     max_page = get_max_page(buttons)
-    logging.info(f'There are {max_page} pages for {symbol}')
+    logger_c.info(f'There are {max_page} pages for {symbol}')
+    logger_v.info(f'There are {max_page} pages for {symbol}')
 
     with open (f'../data/price_history/{symbol}.csv', 'w') as file:
       file.writelines([header])
@@ -97,13 +121,14 @@ def main(argv):
 
       current_page = 2
       while 1:
-        # logging.info(f'Current page is {current_page}')
+        logger_v.info(f'Current page is {current_page}')
 
         try:
           buttons = driver.find_elements_by_class_name('paginate_button')
-          # logging.info('Found the navigation buttons.')
+          logger_v.info('Found the navigation buttons.')
         except:
-          logging.error('Couldn\'t find page naviagation buttons')
+          logger_c.error('Couldn\'t find page naviagation buttons')
+          logger_v.error('Couldn\'t find page naviagation buttons')
           driver.quit()
           sys.exit()
 
@@ -113,14 +138,15 @@ def main(argv):
 
           if (int(button.text) == current_page):
             button.click()
-            # logging.info('Target button found and clicked.')
+            logger_v.info('Target button found and clicked.')
             time.sleep(4)
             try:
               table = driver.find_element_by_id("myTableCPriceHistory")
               table_body = table.find_element_by_tag_name("tbody")
-              # logging.info('Table data found')
+              logger_v.info('Table data found')
             except:
-              logging.error('Table data not found.')
+              logger_c.error('Table data not found.')
+              logger_v.error('Table data not found.')
               driver.quit()
               sys.exit()
 
@@ -128,20 +154,24 @@ def main(argv):
 
             file.writelines(body_text)
             file.write("\n")
-            # logging.info(f'Successfully wrote page {current_page}')
+            logger_v.info(f'Successfully wrote page {current_page}')
             break # Stop looking at other buttons
         else:
           current_page = current_page-1
           if (current_page == max_page):
-            logging.info(f'{max_page}/{max_page} pages of {symbol}have been scraped successfull in {time.time() - start_time:.2f} seconds.')
+            logger_c.info(f'{max_page}/{max_page} pages of {symbol}have been scraped successfull in {time.time() - start_time:.2f} seconds.')
+            logger_v.info(f'{max_page}/{max_page} pages of {symbol}have been scraped successfull in {time.time() - start_time:.2f} seconds.')
           else:
-            logging.error(f'Could not scrape all pages, stopped at {current_page} after {time.time() - start_time:.2f} seconds')
+            logger_v.error(f'Could not scrape all pages, stopped at {current_page} after {time.time() - start_time:.2f} seconds')
+            logger_v.error(f'Could not scrape all pages, stopped at {current_page} after {time.time() - start_time:.2f} seconds')
           break # If all buttons have been looked at, then stop looking
         current_page+=1
       with open('../data/completed.txt', 'a') as outfile:
-        outfile.writelines(f"{symbol}\n")
+        outfile.writelines(f"{symbol.strip().lower()}\n")
+
   driver.quit()
-  logging.info('Closed driver.')
+  logger_v.info('Closed driver.')
+  logger_c.info('Closed driver.')
 
 if __name__ == '__main__':
   main(sys.argv[1:])
