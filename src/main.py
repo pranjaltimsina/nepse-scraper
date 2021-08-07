@@ -16,7 +16,7 @@ options.headless = True
 
 def setup_logger(logger_name, log_file, level=logging.INFO, mode='a'):
     l = logging.getLogger(logger_name)
-    formatter = logging.Formatter('%(asctime)s %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(levelname)s - %(message)s')
     fileHandler = logging.FileHandler(log_file, mode=mode)
     fileHandler.setFormatter(formatter)
     streamHandler = logging.StreamHandler()
@@ -37,30 +37,31 @@ def scrape(symbol):
   try:
     driver = webdriver.Chrome(executable_path=r'D://Dev/chromedriver.exe', options=options)
     logger_v.info('Driver started.')
+    logger_c.info('Driver started.')
   except:
     logger_v.info('Driver start up failed')
     logger_c.info('Driver start up failed')
-    return f"Thread {t_id}: {symbol} retured after driver start up failed."
+    return 0, f"Thread {t_id}: {symbol} retured after driver start up failed."
 
   start_time = time.time()
 
   try:
     driver.get(f"https://www.sharesansar.com/company/{symbol}")
   except:
-    logger_c.error('Could open site')
-    logger_v.error('Could open site')
+    logger_c.error('Could not open site')
+    logger_v.error('Could not open site')
     driver.quit()
-    return f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds as the page could not be opened."
+    return 0, f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds as the page could not be opened."
 
   try:
     price_button = driver.find_element_by_id('btn_cpricehistory')
     price_button.click()
     time.sleep(3)
   except:
-    logger_c.error('Price button couldn\'t be found and clicked on.')
-    logger_v.error('Price button couldn\'t be found and clicked on.')
+    logger_c.error('Price button couldn\'t be found and clicked on. No pages scraped.')
+    logger_v.error('Price button couldn\'t be found and clicked on. No pages scraped.')
     driver.quit()
-    return f"Thread {t_id}: {symbol} retured after after {time.time() - start_time:.2f} seconds. Error finding and clicking price history button."
+    return 0, f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds. Error finding and clicking price history button. 0 pages scraped."
 
   try:
     table = driver.find_element_by_id("myTableCPriceHistory")
@@ -68,7 +69,7 @@ def scrape(symbol):
       logger_v.error('Table not found. Driver Closed')
       logger_c.error('Table not found. Driver Closed')
       driver.quit()
-      return f"Thread {id}: {symbol} retured after {time.time() - start_time:.2f} seconds as table not found."
+      return 0, f"Thread {id}: {symbol} retured after {time.time() - start_time:.2f} seconds as table not found."
 
 
   header = table.text
@@ -82,7 +83,7 @@ def scrape(symbol):
     logger_c.error('Could not find navigation buttons.')
     logger_v.error('Could not find navigation buttons.')
     driver.quit()
-    return f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds as navigation button scould not be found."
+    return 0, f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds as navigation button scould not be found."
 
   if max_page:
     logger_c.info(f'Scraping {max_page} pages of {symbol}')
@@ -92,6 +93,7 @@ def scrape(symbol):
     logger_v.warning(f'Scraping unknown number of pages of {symbol}')
 
   with open (f'../data/price_history/{symbol}.csv', 'w') as file:
+    logger_v.info(f'Scraping page 1')
     file.writelines([header])
     file.write("\n")
 
@@ -105,7 +107,7 @@ def scrape(symbol):
         logger_c.error('Couldn\'t find page naviagation buttons')
         logger_v.error('Couldn\'t find page naviagation buttons')
         driver.quit()
-        return f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds. Navigation button scould not be found after {current_page-1}/{max_page} pages."
+        return 0, f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds. Navigation button scould not be found after {current_page-1}/{max_page} pages."
 
       for button in buttons:
         if button.text == 'Previous' or button.text == 'Next':
@@ -121,7 +123,7 @@ def scrape(symbol):
             logger_c.error('Table data not found.')
             logger_v.error('Table data not found.')
             driver.quit()
-            return f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds. Table data not found after {current_page-1}/{max_page}."
+            return 0, f"Thread {t_id}: {symbol} retured after {time.time() - start_time:.2f} seconds. Table data not found after {current_page-1}/{max_page}."
 
           body_text = table_body.text.replace("NO RECORD FOUND", r"\n").replace(',', "").replace(" ", ",").split(r"\n")
 
@@ -131,22 +133,20 @@ def scrape(symbol):
           break
       else:
         driver.quit()
-        logger_v.info('Closed driver.')
-        logger_c.info('Closed driver.')
+        current_page = current_page-1
         if (current_page == max_page):
           logger_c.info(f'{max_page}/{max_page} pages of {symbol} have been scraped successfull in {time.time() - start_time:.2f} seconds.')
           logger_v.info(f'{max_page}/{max_page} pages of {symbol} have been scraped successfull in {time.time() - start_time:.2f} seconds.')
           with open('../data/completed.txt', 'a') as outfile:
             outfile.writelines(f"{symbol.strip().lower()}\n")
-          return f'{max_page}/{max_page} pages of {symbol} have been scraped successfull in {time.time() - start_time:.2f} seconds.'
+          return 1, f'{max_page}/{max_page} pages of {symbol} have been scraped successfull in {time.time() - start_time:.2f} seconds.'
         else:
-          current_page = current_page-1
           logger_c.error(f'Could not scrape all pages of {symbol}, stopped at {current_page}/{max_page} after {time.time() - start_time:.2f} seconds')
           logger_v.error(f'Could not scrape all pages of {symbol}, stopped at {current_page}/{max_page} after {time.time() - start_time:.2f} seconds')
           if (current_page >= 0.8*max_page):
             with open('../data/completed.txt', 'a') as outfile:
               outfile.writelines(f"{symbol.strip().lower()}\n")
-          return f'Could not scrape all pages of {symbol}, stopped at {current_page}/{max_page} after {time.time() - start_time:.2f} seconds'
+          return 0, f'Could not scrape all pages of {symbol}, stopped at {current_page}/{max_page} after {time.time() - start_time:.2f} seconds'
         break # If all buttons have been looked at, then stop looking
       current_page+=1
 
@@ -192,7 +192,10 @@ def main():
     results = pool.map(scrape, new_symbols)
 
   for result in results:
-    main_logger.info(result)
+    if result[0]:
+      main_logger.info(f"Success! {result[1]}")
+    else:
+      main_logger.info(f"Failure! {result[0]}")
 
 if __name__ == '__main__':
   main()
