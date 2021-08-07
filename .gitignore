@@ -3,3 +3,4 @@ completed.txt
 logs.log
 __pycache__
 .vscode
+*.log
