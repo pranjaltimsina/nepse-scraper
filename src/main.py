@@ -195,7 +195,7 @@ def main():
     if result[0]:
       main_logger.info(f"Success! {result[1]}")
     else:
-      main_logger.info(f"Failure! {result[0]}")
+      main_logger.info(f"Failure! {result[1]}")
 
 if __name__ == '__main__':
   main()
