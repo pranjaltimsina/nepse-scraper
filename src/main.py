@@ -8,6 +8,8 @@ from multiprocessing import Pool, cpu_count, Lock
 
 from symbols import get_completed, get_symbols
 
+from update_completed import update_completed
+
 def setup_logger(logger_name, log_file, level=logging.INFO, mode='a'):
     l = logging.getLogger(logger_name)
     formatter = logging.Formatter('%(levelname)s - %(message)s')
@@ -31,10 +33,15 @@ def scrape(symbol):
   start_time = time.time()
 
   try:
-    response = requests.get(f"https://www.sharesansar.com/company-chart/history?symbol={symbol}&resolution=1D&from=300000000&to={int(start_time)}")
+    url = f"https://www.sharesansar.com/company-chart/history?symbol={symbol}&resolution=1D&from=300000000&to={int(start_time)}"
+    logger_v.info(f"Sending request to {symbol}")
+    response = requests.get(url)
     if (response.status_code == 200):
+      logger_v.info(f"Received response for {symbol}")
       with open (f'../data/price_history/{symbol}.json', 'wb') as file:
+        logger_v.info(f"Writing data to {symbol}.json")
         file.write(response.content)
+      return 1, f"Thread {t_id}: {symbol} returned after {time.time() - start_time:.2f} seconds."
     else:
       logger_c.error(f'Request failed with status {response.status_code}.')
       logger_v.error(f'Request failed with status {response.status_code}.')
@@ -88,6 +95,7 @@ def main():
   for result in results:
     if result[0]:
       main_logger.info(f"Success! {result[1]}")
+      update_completed()
     else:
       main_logger.info(f"Failure! {result[1]}")
 
