@@ -22,34 +22,43 @@ def setup_logger(logger_name, log_file, level=logging.INFO, mode='a'):
     l.addHandler(fileHandler)
     l.addHandler(streamHandler)
 
-def scrape(symbol):
-  setup_logger('compact_log', f'../logs/t{symbol[0]}_c.log', mode='w')
-  setup_logger('verbose_log', f'../logs/t{symbol[0]}_v.log', mode='w')
+def fetch(data):
+  t_id, symbols = data
+
+  setup_logger('compact_log', f'../logs/t{t_id}_c.log', mode='w')
+  setup_logger('verbose_log', f'../logs/t{t_id}_v.log', mode='w')
   logger_c = logging.getLogger('compact_log')
   logger_v = logging.getLogger('verbose_log')
 
-  t_id, symbol = symbol
+  initial_time = time.time()
 
-  start_time = time.time()
+  for symbol in symbols:
+    start_time = time.time()
 
-  try:
-    url = f"https://www.sharesansar.com/company-chart/history?symbol={symbol}&resolution=1D&from=300000000&to={int(start_time)}"
-    logger_v.info(f"Sending request to {symbol}")
-    response = requests.get(url)
-    if (response.status_code == 200):
-      logger_v.info(f"Received response for {symbol}")
-      with open (f'../data/price_history/{symbol}.json', 'wb') as file:
-        logger_v.info(f"Writing data to {symbol}.json")
-        file.write(response.content)
-      return 1, f"Thread {t_id}: {symbol} returned after {time.time() - start_time:.2f} seconds."
-    else:
-      logger_c.error(f'Request failed with status {response.status_code}.')
-      logger_v.error(f'Request failed with status {response.status_code}.')
-      return 0, f"Thread {t_id}: {symbol} returned after {time.time() - start_time:.2f} seconds as the request failed with status {response.status_code}."
-  except:
-    logger_c.error('Could not get the response.')
-    logger_v.error('Could not get the response.')
-    return 0, f"Thread {t_id}: {symbol} returned after {time.time() - start_time:.2f} seconds as the request failed."
+    try:
+      url = f"https://www.sharesansar.com/company-chart/history?symbol={symbol}&resolution=1D&from=300000000&to={int(start_time)}"
+      logger_v.info(f"Sending request to {symbol}")
+      response = requests.get(url)
+
+      if (response.status_code == 200):
+        logger_v.info(f"Received response for {symbol}")
+
+        with open (f'../data/price_history/{symbol}.json', 'wb') as file:
+          logger_v.info(f"Writing data to {symbol}.json")
+          file.write(response.content)
+
+        logger_v.info(f"Thread {t_id}: {symbol} complete after {time.time() - start_time:.2f} seconds.")
+        continue
+      else:
+        logger_c.error(f'Request failed with status {response.status_code}.')
+        logger_v.error(f"Thread {t_id}: {symbol} returned after {time.time() - start_time:.2f} seconds as the request failed with status {response.status_code}.")
+        continue
+    except:
+      logger_c.error('Could not get the response.')
+      logger_v.error(f"Thread {t_id}: {symbol} returned after {time.time() - start_time:.2f} seconds as the request failed.")
+      continue
+
+  return 1, f"Thread {t_id}: returned after {time.time() - initial_time:.2f} seconds."
 
 def init_child(lock_):
   global lock
@@ -81,16 +90,14 @@ def main():
   lock = Lock()
   pool_size = cpu_count()
 
-  symbols = symbols[:pool_size]
-
-  main_logger.info(f"{symbols} will be scraped.")
+  symbols = [symbols[x:x+16] for x in range(0, len(symbols), 16)]
 
   new_symbols = []
   for i, symbol in enumerate(symbols):
     new_symbols.append((i, symbol))
 
   with Pool(pool_size, initializer=init_child, initargs=(lock,)) as pool:
-    results = pool.map(scrape, new_symbols)
+    results = pool.map(fetch, new_symbols)
 
   for result in results:
     if result[0]:
